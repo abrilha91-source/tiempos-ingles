@@ -57,10 +57,11 @@ function norm(x){return x.toLowerCase().replace(/[’`]/g,"'").replace(/won't/g,
 // ---------- Estado ----------
 const K='tiempos_ingles_v1';
 let D=JSON.parse(localStorage.getItem(K)||'null')||{xp:0,days:[],best:0,t:{},irr:{},pron:{n:0,sum:0},ver:1};
+function migrate(){D.xp=D.xp||0;D.days=D.days||[];D.best=D.best||0;D.t=D.t||{};D.irr=D.irr||{};D.pron=D.pron||{n:0,sum:0};D.ch=D.ch||{};D.done=D.done||{};D.cefr=D.cefr||null;D.tests=D.tests||[];D.min=D.min||{};D.goal=D.goal||15;D.ver=2}migrate();
 const save=()=>localStorage.setItem(K,JSON.stringify(D));
 const today=()=>new Date().toLocaleDateString('en-CA');
 function streak(){let n=0,d=new Date();const S=new Set(D.days);if(!S.has(today()))d.setDate(d.getDate()-1);while(S.has(d.toLocaleDateString('en-CA'))){n++;d.setDate(d.getDate()-1)}return n}
-const LV=['Recluta','Soldado','Cabo','Sargento','Subteniente','Teniente','Capitán','Mayor','Teniente Coronel','Coronel','General'];
+const LV=['Principiante','Aprendiz','Explorador','Constante','Comunicador','Conversador','Fluido','Seguro','Experto','Maestro','Leyenda'];
 const lvl=()=>Math.min(LV.length-1,Math.floor(Math.sqrt(D.xp/40)));
 function st(id){return D.t[id]||(D.t[id]={box:0,due:0,ok:0,no:0})}
 const IV=[0,1,2,4,7,15,30].map(d=>d*864e5);
@@ -68,15 +69,11 @@ function grade(id,ok,store){const s=store?store[id]||(store[id]={box:0,due:0,ok:
 function pickT(pool){pool=pool||CORE;const now=Date.now();const w=pool.map(id=>{const s=st(id);return(s.due<=now?4:1)*(7-s.box)});let r=Math.random()*w.reduce((a,b)=>a+b,0);for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0)return pool[i]}return pool[0]}
 let combo=0;
 function award(id,ok,store){grade(id,ok,store);if(ok){combo++;D.xp+=10+Math.min(combo,10)*2;D.best=Math.max(D.best,combo)}else combo=0;if(!D.days.includes(today()))D.days.push(today());save();hdr()}
-function hdr(){$('#hs').textContent=LV[lvl()]+' · '+D.xp+' XP';$('#hx').textContent='🔥 '+streak()+(combo>1?' · x'+combo:'')}
+function hdr(){$('#hs').textContent=LV[lvl()]+' · '+D.xp+' XP'+(D.cefr?' · '+D.cefr:'');$('#hx').textContent='🔥 '+streak()+(combo>1?' · x'+combo:'')}
 // ---------- Navegación ----------
 let tab='inicio';document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
-function go(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));stopRec();({inicio,formulas,jugar,pron,prog})[t]();scrollTo(0,0);hdr()}
-function inicio(){const due=CORE.filter(id=>st(id).due<=Date.now()).length,nx=Math.pow(lvl()+1,2)*40;
-V.innerHTML=`<div class="card"><h2>¡Hola! 👋</h2><p>Practica los tiempos gramaticales con tu formulario y mejora tu pronunciación. Sesiones cortas de 5 minutos al día bastan.</p>
-<p class="m">Nivel: <b>${LV[lvl()]}</b> · racha: <b>${streak()} días</b> · mejor combo: ${D.best}</p><div class="bar"><i style="width:${Math.min(100,D.xp/nx*100)}%"></i></div><p class="m">${D.xp} / ${nx} XP para el siguiente grado</p></div>
-<div class="card"><h2>Repaso de hoy</h2><p>${due} tiempos te toca repasar. La app elige primero los que más fallas.</p><button onclick="mix()">▶️ Sesión mixta (10 retos)</button></div>
-<div class="card"><h2>Atajos</h2><button class="s" onclick="go('formulas')">📘 Ver fórmulas</button><button class="s" onclick="game('irr')">📚 Irregulares</button><button class="s" onclick="go('pron')">🗣️ Pronunciación</button></div>`}
+function go(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));stopRec();({inicio,formulas:aprender,jugar,pron:hablar,prog})[t]();scrollTo(0,0);hdr()}
+function inicio(){window.inicioV2()}
 function formulas(){const gs=[...new Set(T.map(t=>t.g))];V.innerHTML=gs.map(g=>`<div class="card"><h2>${g}</h2>${T.filter(t=>t.g===g).map(t=>`<button class="s" style="display:block;width:100%;text-align:left" onclick="card('${t.id}')">${t.n}<br><span class="m">${t.es}</span></button>`).join('')}</div>`).join('')}
 function card(id){const t=TM[id];const ex=t.tl?(()=>{const vb=R(VB),s=R(SUBJ);return['a','n','q'].map(f=>conj(id,s,vb,f))})():null;
 V.innerHTML=`<div class="card"><button class="s" onclick="formulas()">← Fórmulas</button><h2>${t.n}</h2><p class="m">${t.es}</p>
@@ -90,16 +87,16 @@ function tlSvg(k){const x=v=>20+v*2.8;let e='';const dot=(p,c)=>e+=`<circle cx="
 ({hab:()=>[10,25,40,55,70,85].forEach(p=>dot(p)),pt:()=>dot(20),ft:()=>dot(82),now:()=>seg(42,58,1),ptc:()=>{ref(20,'ayer 8 pm');seg(12,28,1)},ftc:()=>{ref(80,'mañana 10 am');seg(72,88,1)},pp:()=>{seg(15,48);dot(15)},pastp:()=>{dot(10);ref(28,'otra acción')},futp:()=>{dot(68);ref(84,'para entonces')},ppc:()=>seg(15,50,1),pastpc:()=>{seg(6,26,1);ref(28,'otra acción')},futpc:()=>{seg(60,84,1);ref(85,'fecha')}})[k]();
 return`<svg viewBox="0 0 320 76" width="100%" style="max-width:420px"><line x1="10" y1="40" x2="310" y2="40" stroke="#888" stroke-width="2"/><polygon points="310,35 318,40 310,45" fill="#888"/><line x1="160" y1="30" x2="160" y2="50" stroke="#2e8b57" stroke-width="3"/><text x="160" y="72" font-size="10" text-anchor="middle" fill="#2e8b57">AHORA</text><text x="20" y="72" font-size="10">pasado</text><text x="290" y="72" font-size="10">futuro</text>${e}</svg><p class="m">${TLD[k]}</p>`}
 // ---------- Juegos ----------
-const G={build:['🧩 Arma la oración','Toca las fichas en orden según la fórmula.'],sit:['🎯 ¿Qué tiempo es?','Lee la situación y elige el tiempo correcto.'],conj:['✍️ Conjuga','Escribe la oración completa.'],trans:['🔁 Transforma','Pasa la afirmativa a negativa o pregunta.'],err:['🔍 Encuentra el error','Elige la oración que está MAL.'],tl:['📏 Línea del tiempo','Mira el dibujo y elige el tiempo.'],irr:['📚 Verbos irregulares','Pasado y participio de memoria.']};
+const G={dict:['🎧 Dictado','Escucha y escribe lo que oyes.'],fix:['🩹 Errores de hispanohablantes','Elige la versión correcta.'],chunk:['🧱 Chunks y phrasal verbs','Elige el significado.'],red:['🔗 Inglés hablado','¿Qué significa la reducción?'],build:['🧩 Arma la oración','Toca las fichas en orden según la fórmula.'],sit:['🎯 ¿Qué tiempo es?','Lee la situación y elige el tiempo correcto.'],conj:['✍️ Conjuga','Escribe la oración completa.'],trans:['🔁 Transforma','Pasa la afirmativa a negativa o pregunta.'],err:['🔍 Encuentra el error','Elige la oración que está MAL.'],tl:['📏 Línea del tiempo','Mira el dibujo y elige el tiempo.'],irr:['📚 Verbos irregulares','Pasado y participio de memoria.']};
 function jugar(){V.innerHTML=`<div class="card"><h2>Practicar</h2><p class="m">Cada acierto suma XP y alarga el combo. Lo que fallas vuelve pronto (repetición espaciada).</p><button onclick="mix()">🎲 Sesión mixta</button>
 <h3>Solo un tiempo</h3><select id="ft"><option value="">Todos (los que más fallas primero)</option>${CORE.map(id=>`<option value="${id}">${TM[id].n}</option>`).join('')}</select></div>
 <div class="grid">${Object.entries(G).map(([k,g])=>`<button onclick="game('${k}',$('#ft').value)">${g[0]}<br><span style="font-size:12px;opacity:.85">${g[1]}</span></button>`).join('')}</div>`}
 let Q={};
 function mix(){Q={mix:1,n:0,ok:0,max:10};next()}
 function game(k,f){Q={k,f:f||'',n:0,ok:0,max:10};next()}
-function next(){if(Q.n>=Q.max)return fin();Q.n++;const k=Q.mix?R(['build','sit','conj','trans','err','tl','irr','build','sit']):Q.k;Q.cur=k;const id=Q.f||pickT(k==='sit'||k==='tl'?CORE:CORE);
+function next(){if(Q.n>=Q.max)return fin();Q.n++;const k=Q.mix?R(Q.pool||['build','sit','conj','trans','err','tl','irr','dict','fix','chunk','red']):Q.k;Q.cur=k;const id=Q.f||pickT(k==='sit'||k==='tl'?CORE:CORE);
 V.innerHTML=`<div class="card"><p class="m">${G[k][0]} · ${Q.n}/${Q.max} · aciertos ${Q.ok} <button class="s" style="float:right;padding:4px 10px" onclick="go('jugar')">Salir</button></p><div id="g"></div><div id="fb"></div></div>`;
-({build,sit,conj:conjG,trans,err,tl:tlG,irr})[k](id)}
+({build,sit,conj:conjG,trans,err,tl:tlG,irr,dict:dictG,fix:fixG,chunk:chunkG,red:redG})[k](id)}
 function fb(ok,msg,id,store){if(ok)Q.ok++;award(id,ok,store);$('#fb').innerHTML=`<p class="big ${ok?'okc':'noc'}">${ok?R(['¡Excelente! ✅','¡Bien hecho! ✅','¡Correcto! ✅']):'Casi… ❌'}</p>${msg||''}<button onclick="next()">Siguiente →</button>`;document.querySelectorAll('#g button,#g input').forEach(b=>b.disabled=true)}
 function fin(){const p=Math.round(Q.ok/Q.max*100);V.innerHTML=`<div class="card"><h2>¡Ronda terminada!</h2><p class="big">${Q.ok}/${Q.max} (${p} %)</p><p>${p>=80?'🏅 ¡Dominio!':p>=50?'💪 Vas bien, repite para subir.':'📘 Revisa las fórmulas y vuelve a intentar.'}</p><button onclick="${Q.mix?'mix()':`game('${Q.k}','${Q.f}')`}">Otra ronda</button><button class="s" onclick="go('jugar')">Menú</button></div>`}
 const FN={a:'afirmativa',n:'negativa',q:'interrogativa'};
@@ -170,4 +167,3 @@ V.innerHTML=`<div class="card"><h2>Tu avance</h2><p>Nivel <b>${LV[lvl()]}</b> ·
 function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D)],{type:'application/json'}));a.download='tiempos_respaldo_'+today()+'.json';a.click()}
 function imp(i){const f=i.files[0];if(!f)return;f.text().then(t=>{const x=JSON.parse(t);if(!x||typeof x.xp!=='number'||!x.t)throw 0;D=x;save();alert('Respaldo restaurado.');go('prog')}).catch(()=>alert('Archivo no válido.'))}
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
-go('inicio');
